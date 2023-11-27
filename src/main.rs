@@ -1,15 +1,20 @@
+use directories::UserDirs;
 use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 const OMNI_BALANCES_URL: &str = "https://api.omniexplorer.info/ask.aspx?api=getpropertybalances&prop=3";
+const ERC20_BALANCES_URL: &str = "https://etherscan.io/exportData?type=tokenholders&contract=0x329c6E459FFa7475718838145e5e85802Db2a303&decimal=18";
+const ERC20_BALANCES_FILENAME: &str = "export-tokenholders-for-contract-0x329c6E459FFa7475718838145e5e85802Db2a303.csv";
 const CACHE_DIR: &str = "cache";
 const CACHE_EXPIRY_SECS: u64 = 3600;
 
 fn main() {
     println!("Fetching omni balances");
     fetch_omni_balances();
+    println!("Fetching erc20 balances");
+    fetch_erc20_balances();
     // TODO
     // get public keys for addresses
     // generate cashnotes for public keys
@@ -17,11 +22,41 @@ fn main() {
 }
 
 fn fetch_omni_balances() {
-    // TODO get block height
     let _body = fetch_from_cache_or_internet(OMNI_BALANCES_URL);
-    // TODO get block height again
-    // make sure block height matches
+    // TODO
+    // get block height
     // report block height
+    // parse this balance info
+}
+
+fn fetch_erc20_balances() {
+    // cannot fetch automatically due to captcha
+    // look in download directory for the file
+    let ud = UserDirs::new().unwrap();
+    let dd = ud.download_dir().unwrap();
+    let download_filename = Path::new(&dd).join(ERC20_BALANCES_FILENAME);
+    let _metadata = match fs::metadata(download_filename.clone()) {
+        Ok(m) => m,
+        Err(_) => {
+            // check for the exported file in Downloads
+            // if it's not there, prompt to manually download
+            println!("*******************************");
+            println!("* ACTION REQUIRED");
+            println!("*******************************");
+            println!("ERC20 balances must be fetched manually because of captcha");
+            println!("Open this url in your browser and download the file:");
+            println!("{}", ERC20_BALANCES_URL);
+            println!("Make sure the file is downloaded to");
+            println!("{}", download_filename.display());
+            println!("*******************************");
+            std::process::exit(1);
+        }
+    };
+    // TODO
+    // check if it's too old
+    // get block height
+    // report block height
+    // parse this balance info
 }
 
 fn fetch_from_cache_or_internet(url: &str) -> String {

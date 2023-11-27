@@ -7,5 +7,6 @@ edition = "2021"
 
 [dependencies]
 bitcoin = "0.31.0"
+directories = "5.0.1"
 minreq = { version = "2.11.0", features = ["https-rustls"] }
 sha256 = "1.4.0"
