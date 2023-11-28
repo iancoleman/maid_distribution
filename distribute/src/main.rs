@@ -1,4 +1,5 @@
 use directories::UserDirs;
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -10,31 +11,52 @@ const ERC20_BALANCES_FILENAME: &str = "export-tokenholders-for-contract-0x329c6E
 const CACHE_DIR: &str = "cache";
 const CACHE_EXPIRY_SECS: u64 = 3600;
 
+#[derive(Serialize, Deserialize)]
+struct OMaidBalance {
+    address: String,
+    balance: String,
+    reserved: String,
+}
+
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize)]
+struct EMaidBalance {
+    HolderAddress: String,
+    Balance: String,
+    PendingBalanceUpdate: String,
+}
+
 fn main() {
+    // omaid
     println!("Fetching omni balances");
-    fetch_omni_balances();
+    let omaid_balances = fetch_omni_balances();
+    println!("Total OMaid Balances: {}", omaid_balances.len());
+    // emaid
     println!("Fetching erc20 balances");
-    fetch_erc20_balances();
-    // TODO
+    let emaid_balances = fetch_erc20_balances();
+    println!("Total EMaid Balances: {}", emaid_balances.len());
     // get public keys for addresses
     // generate cashnotes for public keys
     // upload cashnotes to network
 }
 
-fn fetch_omni_balances() {
-    let _body = fetch_from_cache_or_internet(OMNI_BALANCES_URL);
-    // TODO
-    // get block height
-    // report block height
-    // parse this balance info
+fn fetch_omni_balances() -> Vec<OMaidBalance> {
+    let obody = fetch_from_cache_or_internet(OMNI_BALANCES_URL);
+    // parse omni balances
+    let obalances: Vec<OMaidBalance> = serde_json::from_str(&obody).unwrap();
+    obalances
 }
 
-fn fetch_erc20_balances() {
-    // cannot fetch automatically due to captcha
-    // look in download directory for the file
+fn emaid_filename() -> PathBuf {
     let ud = UserDirs::new().unwrap();
     let dd = ud.download_dir().unwrap();
-    let download_filename = Path::new(&dd).join(ERC20_BALANCES_FILENAME);
+    Path::new(&dd).join(ERC20_BALANCES_FILENAME)
+}
+
+fn fetch_erc20_balances() -> Vec<EMaidBalance> {
+    // cannot fetch automatically due to captcha
+    // look in download directory for the file
+    let download_filename = emaid_filename();
     let _metadata = match fs::metadata(download_filename.clone()) {
         Ok(m) => m,
         Err(_) => {
@@ -52,11 +74,17 @@ fn fetch_erc20_balances() {
             std::process::exit(1);
         }
     };
-    // TODO
-    // check if it's too old
-    // get block height
-    // report block height
-    // parse this balance info
+    // parse emaid balances
+    let mut file = fs::File::open(download_filename).unwrap();
+    let mut ebody = String::new();
+    file.read_to_string(&mut ebody).unwrap();
+    let mut reader = csv::Reader::from_reader(ebody.as_bytes());
+    let mut ebalances = Vec::<EMaidBalance>::new();
+    for result in reader.deserialize() {
+        let eb: EMaidBalance = result.unwrap();
+        ebalances.push(eb);
+    }
+    ebalances
 }
 
 fn fetch_from_cache_or_internet(url: &str) -> String {
