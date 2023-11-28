@@ -2,6 +2,7 @@ use sha3::{Digest, Keccak256};
 use std::str::FromStr;
 use tide::{Response, Request};
 use tide::prelude::*;
+use tide_governor::GovernorMiddleware;
 
 #[derive(Deserialize)]
 struct AddressKey {
@@ -18,7 +19,9 @@ struct ReqError {
 async fn main() -> tide::Result<()> {
     tests();
     let mut app = tide::new();
-    app.at("/submit").get(submit);
+    app.at("/submit")
+        .with(GovernorMiddleware::per_minute(5)?)
+        .get(submit);
     app.listen("127.0.0.1:8080").await?;
     Ok(())
 }
