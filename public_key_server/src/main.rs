@@ -22,6 +22,9 @@ async fn main() -> tide::Result<()> {
     app.at("/submit")
         .with(GovernorMiddleware::per_minute(5)?)
         .get(submit);
+    app.at("/")
+        .with(GovernorMiddleware::per_minute(5)?)
+        .serve_file("index.html")?;
     app.listen("127.0.0.1:8080").await?;
     Ok(())
 }

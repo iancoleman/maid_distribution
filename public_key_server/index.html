@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Public Key</title>
+<style>
+body {
+    margin: 10px;
+}
+label {
+    display: block;
+    margin-bottom: 20px;
+}
+input[type='text'] {
+    display: block;
+    width: 800px;
+}
+form {
+    background-color: #E4E4FF;
+    padding: 20px;
+}
+</style>
+    </head>
+    <body>
+        <p>Submit the public key for your address here</p>
+        <form action="/submit" method="GET">
+            <label>
+                Address:
+                <input type="text" name="address">
+            </label>
+            <label>
+                Public key (hex):
+                <input type="text" name="pkhex">
+            </label>
+            <input type="submit" value="Submit">
+        </form>
+        <p>The public key is used to encrypt messages to this address.</p>
+        <p>Don't know your public key? Try the
+        <a href="#">key discovery tool</a>.
+    </body>
