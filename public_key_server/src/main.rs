@@ -1,8 +1,13 @@
 use sha3::{Digest, Keccak256};
+use std::fs;
+use std::io::Write;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use tide::{Response, Request};
 use tide::prelude::*;
 use tide_governor::GovernorMiddleware;
+
+const KEYS_DIR: &str = "keys";
 
 #[derive(Deserialize)]
 struct AddressKey {
@@ -39,9 +44,36 @@ async fn submit(req: Request<()>) -> tide::Result {
         res.set_body(btc_err);
         return Ok(res);
     }
-    // TODO save this pair to file
+    // save this pair to file
+    let save_err = save_to_file(&qs);
+    if save_err.len() > 0 {
+        let mut res = Response::new(500);
+        res.set_body(save_err);
+        return Ok(res);
+    }
     // response
     Ok(format!("Success\nAddress: {}\nPublic Key: {}", qs.address, qs.pkhex).into())
+}
+
+fn key_filename(address: &str) -> PathBuf {
+    Path::new(KEYS_DIR).join(address)
+}
+
+fn save_to_file(ak: &AddressKey) -> &str {
+    // TODO consider if concurrent write is a problem here
+    // I don't think there's a practical concern but it may expose a crash
+    // TODO consider if the address can be manipulated into file system chaos
+    let _ = fs::create_dir(KEYS_DIR);
+    let filename = key_filename(&ak.address);
+    let file = fs::File::create(filename);
+    if !file.is_ok() {
+        return "Error creating record";
+    }
+    let err = file.unwrap().write_all(ak.pkhex.as_bytes());
+    if !err.is_ok() {
+        return "Error writing record";
+    }
+    return "";
 }
 
 fn validate_bitcoin_pair(ak: &AddressKey) -> &str {
@@ -201,6 +233,17 @@ fn tests() {
         assert!(btc_err != "", "Junk input did not return error");
         let eth_err = validate_ethereum_pair(&ak);
         assert!(eth_err != "", "Junk input did not return error");
+    }
+    // address as filename can't break stuff
+    {
+        let ak = AddressKey {
+            address: "../../1CoT3ACy3L8MUSRcRbi9FuZ8Yckz3Ghpwz".to_string(),
+            pkhex: "027a41a6bef82652407562fdff7cbed487ea39e51e0010269cefcd103d421baadc".to_string(),
+        };
+        let btc_err = validate_bitcoin_pair(&ak);
+        assert!(btc_err != "", "Filename abuse did not return error");
+        let eth_err = validate_ethereum_pair(&ak);
+        assert!(eth_err != "", "Filename abuse did not return error");
     }
     // TODO
     // bitcoin pubkey mixed case
