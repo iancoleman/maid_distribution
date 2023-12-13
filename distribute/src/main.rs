@@ -1,4 +1,3 @@
-use directories::UserDirs;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{Read, Write};
@@ -6,8 +5,6 @@ use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 const OMNI_BALANCES_URL: &str = "https://api.omniexplorer.info/ask.aspx?api=getpropertybalances&prop=3";
-const ERC20_BALANCES_URL: &str = "https://etherscan.io/exportData?type=tokenholders&contract=0x329c6E459FFa7475718838145e5e85802Db2a303&decimal=18";
-const ERC20_BALANCES_FILENAME: &str = "export-tokenholders-for-contract-0x329c6E459FFa7475718838145e5e85802Db2a303.csv";
 const CACHE_DIR: &str = "cache";
 const CACHE_EXPIRY_SECS: u64 = 3600;
 
@@ -18,23 +15,11 @@ struct OMaidBalance {
     reserved: String,
 }
 
-#[allow(non_snake_case)]
-#[derive(Serialize, Deserialize)]
-struct EMaidBalance {
-    HolderAddress: String,
-    Balance: String,
-    PendingBalanceUpdate: String,
-}
-
 fn main() {
     // omaid
     println!("Fetching omni balances");
     let omaid_balances = fetch_omni_balances();
     println!("Total OMaid Balances: {}", omaid_balances.len());
-    // emaid
-    println!("Fetching erc20 balances");
-    let emaid_balances = fetch_erc20_balances();
-    println!("Total EMaid Balances: {}", emaid_balances.len());
     // get public keys for addresses
     // generate cashnotes for public keys
     // upload cashnotes to network
@@ -45,46 +30,6 @@ fn fetch_omni_balances() -> Vec<OMaidBalance> {
     // parse omni balances
     let obalances: Vec<OMaidBalance> = serde_json::from_str(&obody).unwrap();
     obalances
-}
-
-fn emaid_filename() -> PathBuf {
-    let ud = UserDirs::new().unwrap();
-    let dd = ud.download_dir().unwrap();
-    Path::new(&dd).join(ERC20_BALANCES_FILENAME)
-}
-
-fn fetch_erc20_balances() -> Vec<EMaidBalance> {
-    // cannot fetch automatically due to captcha
-    // look in download directory for the file
-    let download_filename = emaid_filename();
-    let _metadata = match fs::metadata(download_filename.clone()) {
-        Ok(m) => m,
-        Err(_) => {
-            // check for the exported file in Downloads
-            // if it's not there, prompt to manually download
-            println!("*******************************");
-            println!("* ACTION REQUIRED");
-            println!("*******************************");
-            println!("ERC20 balances must be fetched manually because of captcha");
-            println!("Open this url in your browser and download the file:");
-            println!("{}", ERC20_BALANCES_URL);
-            println!("Make sure the file is downloaded to");
-            println!("{}", download_filename.display());
-            println!("*******************************");
-            std::process::exit(1);
-        }
-    };
-    // parse emaid balances
-    let mut file = fs::File::open(download_filename).unwrap();
-    let mut ebody = String::new();
-    file.read_to_string(&mut ebody).unwrap();
-    let mut reader = csv::Reader::from_reader(ebody.as_bytes());
-    let mut ebalances = Vec::<EMaidBalance>::new();
-    for result in reader.deserialize() {
-        let eb: EMaidBalance = result.unwrap();
-        ebalances.push(eb);
-    }
-    ebalances
 }
 
 fn fetch_from_cache_or_internet(url: &str) -> String {
