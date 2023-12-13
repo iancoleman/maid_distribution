@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="styles.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tauri App</title>
+    <script type="module" src="/main.js" defer></script>
+  </head>
+
+  <body>
+    <div class="container">
+      <div class="online">You are online</div>
+      <h1>Public Key Submit</h1>
+
+      <p>
+      To receive SNT please submit the public key for your MAID address.
+      </p>
+
+      <div>
+          <h2>Secret Key (optional)</h2>
+          <input type="text" class="secret-key" placeholder="Secret key eg L2jcoE6bsDrBWUxk8yMgC6pxDx2zRwX9YSdZ5WryWqpsw1GELcZT">
+          <p class="hint">
+          The secret key is used to calculate the public key and address.
+          The secret key is never stored or sent over the network.
+          </p>
+          <p>
+          This is a
+          <span class="secret-key-type">compressed</span>
+          secret key.
+          </p>
+      </div>
+
+      <h2>Public Key + Address</h2>
+
+      <div>
+          <label>
+              Public Key
+          </label>
+          <textarea class="public-key"></textarea>
+          <p>Key Type</p>
+          <label>
+              <input type="radio" name="public-key-type" class="compressed" checked>
+              Compressed
+          </label>
+          <label>
+              <input type="radio" name="public-key-type" class="uncompressed">
+              Uncompressed
+          </label>
+          <p>
+          The address for this public key is
+          </p>
+          <p class="address">1???</p>
+      </div>
+
+      <div>
+          <p>
+          Submit this public key and address to MaidSafe so SNT can be issued
+          in the future.
+          </p>
+          <button class="submit">Submit</button>
+      </div>
+
+      <script src="bitcoinjs-3.3.0.js"></script>
+      <script src="bitcoinjs-wif-3.0.1.js"></script>
+
+    </div>
+  </body>
+</html>
