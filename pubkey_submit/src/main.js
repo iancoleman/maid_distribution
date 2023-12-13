@@ -153,6 +153,9 @@ function init() {
     DOM.compressed.addEventListener("change", compressedChanged);
     DOM.uncompressed.addEventListener("change", compressedChanged);
     DOM.submit.addEventListener("click", submit);
+    // TODO
+    // add P2WPKH addresses starting with 3
+    // consider if P2SH addresses starting with 3 are needed
 }
 
 window.addEventListener("DOMContentLoaded", init);

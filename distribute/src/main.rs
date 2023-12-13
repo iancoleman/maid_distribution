@@ -20,13 +20,19 @@ fn main() {
     println!("Fetching omni balances");
     let omaid_balances = fetch_omni_balances();
     println!("Total OMaid Balances: {}", omaid_balances.len());
-    // get public keys for addresses
-    // generate cashnotes for public keys
+    // TODO
+    // parse public keys for addresses
+    // generate an encrypted cashnote for public keys using ECIES
     // upload cashnotes to network
+    // decide what to do with addresses that have no pubkey available
 }
 
 fn fetch_omni_balances() -> Vec<OMaidBalance> {
+    // TODO print block height and current time
+    // TODO Consider whether to deal with transactions in mempool
     let obody = fetch_from_cache_or_internet(OMNI_BALANCES_URL);
+    // TODO save body to web archive
+    // TODO save body to safe network
     // parse omni balances
     let obalances: Vec<OMaidBalance> = serde_json::from_str(&obody).unwrap();
     obalances

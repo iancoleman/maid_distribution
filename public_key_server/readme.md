@@ -1,11 +1,10 @@
-A service to match public keys with addresses.
+A service to store public keys for bitcoin addresses.
 
-Having the public key allows encrypted messages to be sent to addresses.
+Having the public key allows encrypted messages to be sent to addresses using
+ECIES.
 
 Many public keys can be found on the blockchain. But any address that hasn't
 done an on-chain transaction will not have exposed their public key.
-
-This accepts both bitcoin and ethereum address:pubkey pairs.
 
 To run the server:
 
