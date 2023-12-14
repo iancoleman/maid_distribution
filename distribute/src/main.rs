@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::fs;
+use std::{env, fs, process};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -13,6 +13,7 @@ struct OMaidBalance {
     address: String,
     balance: String,
     reserved: String,
+    public_key: Option<String>,
 }
 
 fn main() {
@@ -20,8 +21,9 @@ fn main() {
     println!("Fetching omni balances");
     let omaid_balances = fetch_omni_balances();
     println!("Total OMaid Balances: {}", omaid_balances.len());
+    let pubkey_balances = add_public_keys(omaid_balances);
+    println!("Total balances with pubkeys: {}", pubkey_balances.len());
     // TODO
-    // parse public keys for addresses
     // generate an encrypted cashnote for public keys using ECIES
     // upload cashnotes to network
     // decide what to do with addresses that have no pubkey available
@@ -36,6 +38,40 @@ fn fetch_omni_balances() -> Vec<OMaidBalance> {
     // parse omni balances
     let obalances: Vec<OMaidBalance> = serde_json::from_str(&obody).unwrap();
     obalances
+}
+
+fn add_public_keys(balances: Vec<OMaidBalance>) -> Vec<OMaidBalance> {
+    let mut pubkey_balances = Vec::<OMaidBalance>::new();
+    // look in directory for files where
+    // filename is base56 bitcoin address
+    // filecontent is hex public key
+    let mut keys_path = env::current_dir().unwrap();
+    keys_path.push("keys");
+    let metadata = fs::metadata(&keys_path);
+    if !metadata.is_ok() || !metadata.unwrap().is_dir() {
+        println!("keys directory containing public keys does not exist:");
+        println!("{}", keys_path.display());
+        process::exit(1);
+    }
+    // iterate over balances looking for pubkeys
+    for balance in balances {
+        let mut pk_path = keys_path.clone();
+        pk_path.push(&balance.address);
+        if !pk_path.exists() {
+            continue;
+        }
+        let mut file = fs::File::open(pk_path).unwrap();
+        let mut body = String::new();
+        file.read_to_string(&mut body).unwrap();
+        let pk_balance = OMaidBalance{
+            address: balance.address,
+            balance: balance.balance,
+            reserved: balance.reserved,
+            public_key: Some(body),
+        };
+        pubkey_balances.push(pk_balance);
+    }
+    pubkey_balances
 }
 
 fn fetch_from_cache_or_internet(url: &str) -> String {
