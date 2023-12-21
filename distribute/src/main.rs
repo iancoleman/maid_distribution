@@ -23,6 +23,8 @@ fn main() {
     println!("Total OMaid Balances: {}", omaid_balances.len());
     let pubkey_balances = add_public_keys(omaid_balances);
     println!("Total balances with pubkeys: {}", pubkey_balances.len());
+    let total_distributions = total_balance(pubkey_balances);
+    println!("Total to be distributed: {}", total_distributions);
     // TODO
     // generate an encrypted cashnote for public keys using ECIES
     // upload cashnotes to network
@@ -72,6 +74,16 @@ fn add_public_keys(balances: Vec<OMaidBalance>) -> Vec<OMaidBalance> {
         pubkey_balances.push(pk_balance);
     }
     pubkey_balances
+}
+
+fn total_balance(balances: Vec<OMaidBalance>) -> u32 {
+    let mut total = 0u32;
+    for b in balances {
+        if b.public_key.is_some() {
+            total += b.balance.parse::<u32>().unwrap();
+        }
+    }
+    total
 }
 
 fn fetch_from_cache_or_internet(url: &str) -> String {
