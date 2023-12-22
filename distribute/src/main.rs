@@ -1,12 +1,18 @@
+use blsttc::SecretKey;
 use serde::{Deserialize, Serialize};
 use std::{env, fs, process};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::time::SystemTime;
 
 const OMNI_BALANCES_URL: &str = "https://api.omniexplorer.info/ask.aspx?api=getpropertybalances&prop=3";
 const CACHE_DIR: &str = "cache";
 const CACHE_EXPIRY_SECS: u64 = 3600;
+
+// TODO
+// replace this hardcoded secret with distributed keygen using bls_dkg crate
+const WALLET_SECRET_KEY: &str = "5920222d8798f74d09b3cdb6847e145197d52f471e42c83fe728f3dce6ce2878";
 
 #[derive(Serialize, Deserialize)]
 struct OMaidBalance {
@@ -17,18 +23,34 @@ struct OMaidBalance {
 }
 
 fn main() {
-    // omaid
+
+    run_checks();
+
     println!("Fetching omni balances");
     let omaid_balances = fetch_omni_balances();
     println!("Total OMaid Balances: {}", omaid_balances.len());
+
     let pubkey_balances = add_public_keys(omaid_balances);
     println!("Total balances with pubkeys: {}", pubkey_balances.len());
-    let total_distributions = total_balance(pubkey_balances);
-    println!("Total to be distributed: {}", total_distributions);
+
+    let total_distributions_maid = total_balance(pubkey_balances);
+    println!("Total to be distributed: {}", total_distributions_maid);
+
+    println!("Fetching distribution balance from faucet");
+    load_tokens_into_distribution_wallet(total_distributions_maid);
+
     // TODO
+    // check if a wallet already exists and if so move it elsewhere
     // generate an encrypted cashnote for public keys using ECIES
     // upload cashnotes to network
     // decide what to do with addresses that have no pubkey available
+}
+
+fn run_checks() {
+    // TODO
+    // Check peers are available / can connect to network
+    // Check the faucet is available on $PATH
+    // Check the client is available on $PATH
 }
 
 fn fetch_omni_balances() -> Vec<OMaidBalance> {
@@ -76,14 +98,83 @@ fn add_public_keys(balances: Vec<OMaidBalance>) -> Vec<OMaidBalance> {
     pubkey_balances
 }
 
-fn total_balance(balances: Vec<OMaidBalance>) -> u32 {
-    let mut total = 0u32;
-    for b in balances {
-        if b.public_key.is_some() {
-            total += b.balance.parse::<u32>().unwrap();
+fn load_tokens_into_distribution_wallet(amount_maid: u32) {
+    // This uses the existing faucet functionality.
+    // This doesn't use the server function of the faucet
+    // because that will only issue 100 tokens at a time.
+    // It uses the faucet binary
+    // so must be run on the same machine as the faucet
+    // with the faucet binary on $PATH.
+    // TODO remove unwraps below
+    let sk_vec = hex::decode(WALLET_SECRET_KEY).unwrap();
+    let sk_bytes: [u8; 32] = sk_vec.as_slice().try_into().unwrap();
+    let sk = SecretKey::from_bytes(sk_bytes).unwrap();
+    let pk = sk.public_key();
+    let pk_hex = hex::encode(pk.to_bytes());
+    println!("Getting {} tokens from faucet", amount_maid);
+    // the command is:
+    // faucet send amount to
+    let faucet_output = Command::new("faucet")
+        .args(["send", &amount_maid.to_string(), &pk_hex])
+        .output()
+        .unwrap();
+    if !faucet_output.status.success() {
+        println!("FAUCET STDOUT:\n{}", String::from_utf8_lossy(&faucet_output.stdout));
+        println!("FAUCET STDERR:\n{}", String::from_utf8_lossy(&faucet_output.stderr));
+        panic!("Failed to get from faucet, status {}", faucet_output.status);
+    }
+    // print any error
+    let stderr_bytes = faucet_output.stderr;
+    if stderr_bytes.len() > 0 {
+        println!("Faucet error:");
+        println!("{}", String::from_utf8_lossy(&stderr_bytes));
+    }
+    // get the transfer from the output of the faucet
+    let stdout_bytes = faucet_output.stdout;
+    let stdout = String::from_utf8_lossy(&stdout_bytes);
+    let lines = stdout.split("\n");
+    let mut transfer_hex = "";
+    for line in lines {
+        if line.len() > 100 && hex::decode(line).is_ok() {
+            transfer_hex = line;
         }
     }
-    total
+    if transfer_hex.len() == 0 {
+        panic!("Empty transfer from faucet");
+    }
+    // use our secret key for the cli wallet
+    println!("Creating wallet with our sk");
+    let wallet_create_output = Command::new("safe")
+        .args(["wallet", "create", &WALLET_SECRET_KEY])
+        .output()
+        .unwrap();
+    if !wallet_create_output.status.success() {
+        println!("CREATE STDOUT:\n{}", String::from_utf8_lossy(&wallet_create_output.stdout));
+        println!("CREATE STDERR:\n{}", String::from_utf8_lossy(&wallet_create_output.stderr));
+        panic!("Failed to create wallet, status {}", wallet_create_output.status);
+    }
+    println!("Receiving transfer to our wallet");
+    // receive the transfer using the cli
+    let wallet_receive_output = Command::new("safe")
+        .args(["wallet", "receive", &transfer_hex])
+        .output()
+        .unwrap();
+    if !wallet_receive_output.status.success() {
+        println!("RECEIVE STDOUT:\n{}", String::from_utf8_lossy(&wallet_receive_output.stdout));
+        println!("RECEIVE STDERR:\n{}", String::from_utf8_lossy(&wallet_receive_output.stderr));
+        panic!("Failed to receive transfer, status {}", wallet_receive_output.status);
+    }
+    println!("RECEIVE STDOUT:\n{}", String::from_utf8_lossy(&wallet_receive_output.stdout));
+}
+
+fn total_balance(balances: Vec<OMaidBalance>) -> u32 {
+    let mut total_maid = 0u32;
+    for b in balances {
+        if b.public_key.is_some() {
+            total_maid += b.balance.parse::<u32>().unwrap();
+        }
+    }
+    total_maid
 }
 
 fn fetch_from_cache_or_internet(url: &str) -> String {
