@@ -1,8 +1,10 @@
 use blsttc::SecretKey;
 use serde::{Deserialize, Serialize};
-use std::{env, fs, process};
+use std::env;
+use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::process;
 use std::process::Command;
 use std::time::SystemTime;
 
@@ -13,6 +15,14 @@ const CACHE_EXPIRY_SECS: u64 = 3600;
 // TODO
 // replace this hardcoded secret with distributed keygen using bls_dkg crate
 const WALLET_SECRET_KEY: &str = "5920222d8798f74d09b3cdb6847e145197d52f471e42c83fe728f3dce6ce2878";
+const ENCRYPTED_MD_DIR: &str = "encrypted_maid_distributions";
+
+// Generated with bip39 phrase
+// wedding pig fiscal
+// bip44 derivation path m/44'/0'/0'/0/0
+const TEST_BITCOIN_ADDRESS: &str = "1LyVLuxCbgLgYCZ6Sk6BrPJqAhixuyJpP7";
+const TEST_BITCOIN_PUBLIC_KEY: &str = "02888b3476298033f5f6ac52f868d603ace34de8918944a2ecde9b61e751132926";
+const _TEST_BITCOIN_SECRET_KEY: &str = "KyNdvxT1Ead7AD9thdvg8399fVxC1Tdf9FvPc2dqmmnHstcTUH5y";
 
 #[derive(Serialize, Deserialize)]
 struct OMaidBalance {
@@ -20,6 +30,14 @@ struct OMaidBalance {
     balance: String,
     reserved: String,
     public_key: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct MaidDistribution {
+    #[serde(with = "serde_bytes")]
+    transfer: Vec<u8>,
+    #[serde(with = "serde_bytes")]
+    secret_key: Vec<u8>,
 }
 
 fn main() {
@@ -30,27 +48,38 @@ fn main() {
     let omaid_balances = fetch_omni_balances();
     println!("Total OMaid Balances: {}", omaid_balances.len());
 
-    let pubkey_balances = add_public_keys(omaid_balances);
+    let mut pubkey_balances = add_public_keys(&omaid_balances);
     println!("Total balances with pubkeys: {}", pubkey_balances.len());
 
-    let total_distributions_maid = total_balance(pubkey_balances);
+    // Add an extra entry for the test address.
+    // In production this may be excluded.
+    pubkey_balances.push(OMaidBalance{
+        address: TEST_BITCOIN_ADDRESS.to_string(),
+        balance: "1".to_string(),
+        reserved: "0".to_string(),
+        public_key: Some(TEST_BITCOIN_PUBLIC_KEY.to_string()),
+    });
+
+    let distribution_amount = total_balance(&pubkey_balances);
+    // Need a little extra in the wallet to upload the data to the safe network
+    let upload_amount = 1;
+    let total_distributions_maid = distribution_amount + upload_amount;
     println!("Total to be distributed: {}", total_distributions_maid);
 
     println!("Fetching distribution balance from faucet");
     load_tokens_into_distribution_wallet(total_distributions_maid);
 
-    // TODO
-    // check if a wallet already exists and if so move it elsewhere
-    // generate an encrypted cashnote for public keys using ECIES
-    // upload cashnotes to network
-    // decide what to do with addresses that have no pubkey available
+    println!("Creating distributions");
+    distribute_tokens(&pubkey_balances);
 }
 
 fn run_checks() {
     // TODO
+    // check if a wallet already exists and if so move it elsewhere
     // Check peers are available / can connect to network
     // Check the faucet is available on $PATH
     // Check the client is available on $PATH
+    // create encrypted md directory if not exist
 }
 
 fn fetch_omni_balances() -> Vec<OMaidBalance> {
@@ -64,7 +93,7 @@ fn fetch_omni_balances() -> Vec<OMaidBalance> {
     obalances
 }
 
-fn add_public_keys(balances: Vec<OMaidBalance>) -> Vec<OMaidBalance> {
+fn add_public_keys(balances: &Vec<OMaidBalance>) -> Vec<OMaidBalance> {
     let mut pubkey_balances = Vec::<OMaidBalance>::new();
     // look in directory for files where
     // filename is base56 bitcoin address
@@ -88,9 +117,9 @@ fn add_public_keys(balances: Vec<OMaidBalance>) -> Vec<OMaidBalance> {
         let mut body = String::new();
         file.read_to_string(&mut body).unwrap();
         let pk_balance = OMaidBalance{
-            address: balance.address,
-            balance: balance.balance,
-            reserved: balance.reserved,
+            address: balance.address.clone(),
+            balance: balance.balance.clone(),
+            reserved: balance.reserved.clone(),
             public_key: Some(body),
         };
         pubkey_balances.push(pk_balance);
@@ -167,7 +196,123 @@ fn load_tokens_into_distribution_wallet(amount_maid: u32) {
     println!("RECEIVE STDOUT:\n{}", String::from_utf8_lossy(&wallet_receive_output.stdout));
 }
 
-fn total_balance(balances: Vec<OMaidBalance>) -> u32 {
+fn maid_distribution_filepath(maid_address: String) -> PathBuf {
+    Path::new(ENCRYPTED_MD_DIR).join(maid_address)
+}
+
+fn distribute_tokens(balances: &Vec<OMaidBalance>) {
+    let mut all_encrypted_maid_distributions_csv = "MAID address,Distribution\n".to_string();
+    for b in balances {
+        // check it has a public key
+        if b.public_key.is_none() {
+            continue;
+        }
+        // check it has a valid balance
+        let balance = b.balance.parse::<u32>().unwrap();
+        if balance == 0 {
+            continue;
+        }
+        // check if this has already been distributed
+        let _ = fs::create_dir(ENCRYPTED_MD_DIR);
+        let md_filepath = maid_distribution_filepath(b.address.clone());
+        let mut encrypted_md_hex = String::new();
+        if md_filepath.exists() {
+            // read existing MaidDistribution from file
+            let mut file = fs::File::open(md_filepath.clone()).unwrap();
+            file.read_to_string(&mut encrypted_md_hex).unwrap();
+        }
+        else {
+            // create new encrypted MaidDistribution for this maid address
+            println!("Creating distribution of {} tokens for {}", b.balance.clone(), b.address.clone());
+            encrypted_md_hex = create_new_maid_distribution(b);
+        }
+        // keep track of the upload location and the maid address
+        let row = format!("{},{}\n", b.address, encrypted_md_hex);
+        all_encrypted_maid_distributions_csv += &row;
+    }
+    // save all_encrypted_maid_distributions_csv
+    let csv_filepath = maid_distribution_filepath("all_distributions.csv".to_string());
+    let mut file = fs::File::create(csv_filepath.clone()).unwrap();
+    let _ = file.write_all(&all_encrypted_maid_distributions_csv.as_bytes());
+    // upload the list of addresses -> encrypted MaidDistribution
+    let upload_output = Command::new("safe")
+        .args(["files", "upload", &csv_filepath.as_os_str().to_str().unwrap()])
+        .output()
+        .unwrap();
+    if !upload_output.status.success() {
+        println!("UPLOAD STDOUT:\n{}", String::from_utf8_lossy(&upload_output.stdout));
+        println!("UPLOAD STDERR:\n{}", String::from_utf8_lossy(&upload_output.stderr));
+        panic!("Failed to upload MaidDistribution, status {}", upload_output.status);
+    }
+    let upload_stdout_bytes = upload_output.stdout;
+    let upload_stdout = String::from_utf8_lossy(&upload_stdout_bytes);
+    // get the address of the uploaded data
+    let words = upload_stdout.split_whitespace();
+    let mut csv_address = "";
+    for word in words {
+        if word.len() == 64 && hex::decode(word).is_ok() {
+            csv_address = word;
+        }
+    }
+    if csv_address.len() == 0 {
+        panic!("No address for uploaded MaidDistribution list");
+    }
+    // print out the location of that mapping
+    println!("Address for distribution csv: {}", csv_address);
+}
+
+fn create_new_maid_distribution(b: &OMaidBalance) -> String {
+    // Generate random key for the maid user to use for spending.
+    // This key should be generated from dkg, so this step will change in
+    // the future.
+    // For testnets, so long as the recipient key is never stored or known
+    // the process is safe enough.
+    let recipient_sk = SecretKey::random();
+    let recipient_pk = recipient_sk.public_key();
+    let recipient_pk_hex = hex::encode(recipient_pk.to_bytes());
+    // generate a transfer to this public key
+    let wallet_send_output = Command::new("safe")
+        .args(["wallet", "send", &b.balance, &recipient_pk_hex])
+        .output()
+        .unwrap();
+    if !wallet_send_output.status.success() {
+        println!("SEND STDOUT:\n{}", String::from_utf8_lossy(&wallet_send_output.stdout));
+        println!("SEND STDERR:\n{}", String::from_utf8_lossy(&wallet_send_output.stderr));
+        panic!("Failed to send transfer, status {}", wallet_send_output.status);
+    }
+    let stdout_bytes = wallet_send_output.stdout;
+    let stdout = String::from_utf8_lossy(&stdout_bytes);
+    let lines = stdout.split("\n");
+    let mut transfer_hex = "";
+    for line in lines {
+        if line.len() > 100 && hex::decode(line).is_ok() {
+            transfer_hex = line;
+        }
+    }
+    if transfer_hex.len() == 0 {
+        panic!("Empty transfer to {}", b.address);
+    }
+    let transfer_bytes = hex::decode(transfer_hex).unwrap();
+    // create a MaidDistribution using this information
+    let md = MaidDistribution{
+        transfer: transfer_bytes.clone(),
+        secret_key: recipient_sk.to_bytes().to_vec(),
+    };
+    // encode the MD using messagepack
+    let md_bytes = rmp_serde::to_vec(&md).unwrap();
+    // encrypt the messagepack bytes using ECIES and bitcoin public key
+    let maid_pk_hex = b.public_key.clone().unwrap();
+    let maid_pk_bytes = hex::decode(maid_pk_hex).unwrap();
+    let encrypted_md = ecies::encrypt(&maid_pk_bytes, &md_bytes).unwrap();
+    let encrypted_md_hex = hex::encode(encrypted_md);
+    // save encrypted md to file
+    let md_filepath = maid_distribution_filepath(b.address.clone());
+    let mut file = fs::File::create(md_filepath.clone()).unwrap();
+    let _ = file.write_all(&encrypted_md_hex.as_bytes());
+    encrypted_md_hex
+}
+
+fn total_balance(balances: &Vec<OMaidBalance>) -> u32 {
     let mut total_maid = 0u32;
     for b in balances {
         if b.public_key.is_some() {
