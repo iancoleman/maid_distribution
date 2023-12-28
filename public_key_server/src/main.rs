@@ -87,15 +87,21 @@ fn validate_bitcoin_pair(ak: &AddressKey) -> &str {
     if !addr.is_ok() {
         return "Invalid address";
     }
-    let btc_addr = addr.unwrap().require_network(bitcoin::Network::Bitcoin);
+    let btc_addr = addr.clone().unwrap().require_network(bitcoin::Network::Bitcoin);
     if !btc_addr.is_ok() {
         return "Invalid network";
     }
     // bitcoin public key matches bitcoin address
-    if !btc_addr.unwrap().is_related_to_pubkey(&pk.unwrap()) {
-        return "Public key does not match address";
+    // p2pkh
+    if btc_addr.clone().unwrap().is_related_to_pubkey(&pk.clone().unwrap()) {
+        return "";
     }
-    return "";
+    // p2wpkh
+    let p2wpkh_addr = bitcoin::Address::p2shwpkh(&pk.clone().unwrap(), bitcoin::Network::Bitcoin).unwrap();
+    if p2wpkh_addr == addr.unwrap() {
+        return "";
+    }
+    return "Public key does not match address";
 }
 
 fn validate_ethereum_pair(ak: &AddressKey) -> &str {
@@ -186,6 +192,15 @@ fn tests() {
         };
         let err = validate_bitcoin_pair(&ak);
         assert!(err != "", "Mismatched bitcoin pair should give error but did not");
+    }
+    // p2wpkh bitcoin pair
+    {
+        let ak = AddressKey {
+            address: "39Q6Y89u1wMYacDJw63UNiYgj3wfJtZbRj".to_string(),
+            pkhex: "03608934ee3cd78469528f55bab4f1db60f3fbdd793067503dfef6d7903dbf61e9".to_string(),
+        };
+        let err = validate_bitcoin_pair(&ak);
+        assert!(err == "", "Valid P2WPKH pair threw error: {}", err);
     }
     // valid ethereum pair
     {
