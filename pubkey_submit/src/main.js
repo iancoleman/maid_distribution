@@ -10,6 +10,7 @@ DOM.secretKeyType = document.querySelector(".secret-key-type");
 DOM.publicKey = document.querySelector(".public-key");
 DOM.compressed = document.querySelector(".compressed");
 DOM.uncompressed = document.querySelector(".uncompressed");
+DOM.p2wpkh = document.querySelector(".p2wpkh");
 DOM.address = document.querySelector(".address");
 DOM.submit = document.querySelector(".submit");
 
@@ -52,6 +53,11 @@ function showUncompressed() {
     DOM.uncompressed.checked = true;
 }
 
+function showP2wpkh() {
+    DOM.secretKeyType.textContent = "p2wpkh";
+    DOM.p2wpkh.checked = true;
+}
+
 function getSecretKeyFromUI() {
     let skWif = DOM.secretKey.value;
     let sk = bitcoinjs.bitcoin.ECPair.fromWIF(skWif);
@@ -63,7 +69,7 @@ function secretKeyChanged(e) {
     if (sk.compressed) {
         showCompressed();
     }
-    else {
+    else if (sk) {
         showUncompressed();
     }
     showPublicKey(sk);
@@ -95,17 +101,21 @@ function publicKeyChanged() {
     else {
         showUncompressed();
     }
+
     showAddress(pk);
 }
 
-function compressedChanged() {
-    let compressed = DOM.compressed.checked;
+function pkTypeChanged() {
+    let compressed = DOM.compressed.checked || DOM.p2wpkh.checked;
     // show status in UI for sk and radios
-    if (compressed) {
+    if (DOM.compressed.checked) {
         showCompressed();
     }
-    else {
+    else if (DOM.uncompressed.checked) {
         showUncompressed();
+    }
+    else if (DOM.p2wpkh.checked) {
+        showP2wpkh();
     }
     let keypair = getPublicKeyFromUI();
     if (DOM.secretKey.value != "") {
@@ -138,6 +148,14 @@ function showPublicKey(keypair) {
 
 function showAddress(pk) {
     let address = pk.getAddress();
+    if (DOM.p2wpkh.checked) {
+        let keyhash = bitcoinjs.bitcoin.crypto.hash160(pk.getPublicKeyBuffer());
+        let scriptsig = bitcoinjs.bitcoin.script.witnessPubKeyHash.output.encode(keyhash);
+        let addressbytes = bitcoinjs.bitcoin.crypto.hash160(scriptsig);
+        let scriptpubkey = bitcoinjs.bitcoin.script.scriptHash.output.encode(addressbytes);
+        let network = bitcoinjs.bitcoin.networks.bitcoin;
+        address = bitcoinjs.bitcoin.address.fromOutputScript(scriptpubkey, network);
+    }
     DOM.address.textContent = address;
 }
 
@@ -157,8 +175,9 @@ function init() {
     trackOnlineStatus();
     DOM.secretKey.addEventListener("input", secretKeyChanged);
     DOM.publicKey.addEventListener("input", publicKeyChanged);
-    DOM.compressed.addEventListener("change", compressedChanged);
-    DOM.uncompressed.addEventListener("change", compressedChanged);
+    DOM.compressed.addEventListener("change", pkTypeChanged);
+    DOM.uncompressed.addEventListener("change", pkTypeChanged);
+    DOM.p2wpkh.addEventListener("change", pkTypeChanged);
     DOM.submit.addEventListener("click", submit);
     // TODO
     // add P2WPKH addresses starting with 3
