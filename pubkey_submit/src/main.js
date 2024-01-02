@@ -18,6 +18,7 @@ DOM.p2wpkh = document.querySelector(".p2wpkh");
 DOM.address = document.querySelector(".address");
 DOM.submit = document.querySelector(".submit");
 DOM.submitFeedback = document.querySelector(".feedback");
+DOM.clear = document.querySelectorAll(".clear-secrets");
 
 const ONLINE_STR = "This computer is currently online and connected to the internet";
 const OFFLINE_STR = "This computer is currently offline";
@@ -201,6 +202,11 @@ function bufferToHex(b) {
     return b.reduce((s, b) => s + b.toString(16).padStart(2, '0'), '');
 }
 
+function clearSecrets() {
+    DOM.secretKey.value = "";
+    // TODO consider clearing clipboard if it contains a secret key?
+}
+
 function init() {
     trackOnlineStatus();
     DOM.secretKey.addEventListener("input", secretKeyChanged);
@@ -209,9 +215,9 @@ function init() {
     DOM.uncompressed.addEventListener("change", pkTypeChanged);
     DOM.p2wpkh.addEventListener("change", pkTypeChanged);
     DOM.submit.addEventListener("click", submit);
-    // TODO
-    // add P2WPKH addresses starting with 3
-    // consider if P2SH addresses starting with 3 are needed
+    DOM.clear.forEach((e) => {
+        e.addEventListener("click", clearSecrets);
+    });
 }
 
 window.addEventListener("DOMContentLoaded", init);
