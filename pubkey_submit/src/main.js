@@ -167,6 +167,10 @@ function submit() {
             let errMsg = "Error submitting: " + resp.data;
             DOM.submitFeedback.textContent = errMsg;
         }
+      })
+      .catch((e) => {
+          let errMsg = "Error: " + e;
+          DOM.submitFeedback.textContent = errMsg;
       });
 }
 
