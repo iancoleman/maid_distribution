@@ -1,4 +1,8 @@
-const { invoke } = window.__TAURI__.tauri;
+const invoke = window.__TAURI__.tauri.invoke;
+const fetch = window.__TAURI__.http.fetch;
+const ResponseType = window.__TAURI__.http.ResponseType;
+
+const submitUrl = "http://127.0.0.1:8080/submit";
 
 let greetInputEl;
 let greetMsgEl;
@@ -13,6 +17,7 @@ DOM.uncompressed = document.querySelector(".uncompressed");
 DOM.p2wpkh = document.querySelector(".p2wpkh");
 DOM.address = document.querySelector(".address");
 DOM.submit = document.querySelector(".submit");
+DOM.submitFeedback = document.querySelector(".feedback");
 
 const ONLINE_STR = "This computer is currently online and connected to the internet";
 const OFFLINE_STR = "This computer is currently offline";
@@ -134,9 +139,34 @@ function pkTypeChanged() {
 }
 
 function submit() {
-    // TODO
-    // verify the address/pubkey
-    // submit it
+    let address = DOM.address.textContent.trim();
+    let pkhex = DOM.publicKey.value.trim();
+    if (pkhex.length == 0) {
+        DOM.submitFeedback.textContent = "Empty public key";
+        return;
+    }
+    if (address.length == 0) {
+        DOM.submitFeedback.textContent = "Empty address";
+        return;
+    }
+    DOM.submitFeedback.textContent = "Submitting...";
+    let params = "?address=" + address + "&pkhex=" + pkhex;
+    let url = submitUrl + params;
+
+    fetch(url, {
+      method: "GET",
+      timeout: 30, //seconds
+      responseType: ResponseType.Text,
+    })
+      .then((resp) => {
+        if (resp.ok) {
+            DOM.submitFeedback.textContent = "Public key submitted";
+        }
+        else {
+            let errMsg = "Error submitting: " + resp.data;
+            DOM.submitFeedback.textContent = errMsg;
+        }
+      });
 }
 
 function showPublicKey(keypair) {

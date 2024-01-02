@@ -6,3 +6,9 @@ To run it
 ```
 cargo tauri dev
 ```
+
+For production:
+
+* Change `const submitUrl` in `main.js` to the correct remote server address
+
+* Change `allowlist.http.scope` in `tauri.conf.json` to the remote server
