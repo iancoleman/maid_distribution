@@ -4,7 +4,7 @@ let greetInputEl;
 let greetMsgEl;
 
 let DOM = {};
-DOM.online = document.querySelector(".online");
+DOM.online = document.querySelectorAll(".online");
 DOM.secretKey = document.querySelector(".secret-key");
 DOM.secretKeyType = document.querySelector(".secret-key-type");
 DOM.publicKey = document.querySelector(".public-key");
@@ -13,16 +13,23 @@ DOM.uncompressed = document.querySelector(".uncompressed");
 DOM.address = document.querySelector(".address");
 DOM.submit = document.querySelector(".submit");
 
+const ONLINE_STR = "This computer is currently online and connected to the internet";
+const OFFLINE_STR = "This computer is currently offline";
+
 async function greet() {
   greetMsgEl.textContent = await invoke("greet", { name: greetInputEl.value });
 }
 
 function showOnline() {
-    DOM.online.textContent = "You are online";
+    for (let i=0; i<DOM.online.length; i++) {
+        DOM.online[i].textContent = ONLINE_STR;
+    }
 }
 
 function showOffline() {
-    DOM.online.textContent = "You are offline";
+    for (let i=0; i<DOM.online.length; i++) {
+        DOM.online[i].textContent = OFFLINE_STR;
+    }
 }
 
 function trackOnlineStatus() {

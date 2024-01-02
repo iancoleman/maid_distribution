@@ -10,15 +10,25 @@
 
   <body>
     <div class="container">
-      <div class="online">You are online</div>
-      <h1>Public Key Submit</h1>
+      <h1>Token Distribution</h1>
 
       <p>
       To receive SNT please submit the public key for your MAID address.
       </p>
 
       <div>
-          <h2>Secret Key (optional)</h2>
+          <h2>Step 1: MAID Secret Key (optional)</h2>
+          <p>
+          This step only needs to be done once.
+          If you've done this step before, skip to the Token Distribution step.
+          </p>
+          <p>
+          This step is safest to perform offline.
+          <span class="online">This computer may be online (not sure yet, still checking).</span>
+          </p>
+          <label>
+              Secret Key:
+          </label>
           <input type="text" class="secret-key" placeholder="Secret key eg L2jcoE6bsDrBWUxk8yMgC6pxDx2zRwX9YSdZ5WryWqpsw1GELcZT">
           <p class="hint">
           The secret key is used to calculate the public key and address.
@@ -31,11 +41,24 @@
           </p>
       </div>
 
-      <h2>Public Key + Address</h2>
 
       <div>
+          <h2>Step 2: MAID Public Key + Address</h2>
+          <p>
+          This step only needs to be done once.
+          If you've done this step before, skip to the Token Distribution step.
+          </p>
+          <p>
+          This step may be done online or offline.
+          <span class="online">This computer may be online (not sure yet, still checking).</span>
+          </p>
+          <p>
+          To maximize safety, it's recommended to
+          <button class="clear-secrets">clear</button>
+          all secrets in this tool <i>before</i> connecting to the internet.
+          </p>
           <label>
-              Public Key
+              Public Key:
           </label>
           <textarea class="public-key"></textarea>
           <p>Key Type</p>
@@ -54,11 +77,72 @@
       </div>
 
       <div>
+          <h2>Step 3: Submit MAID public key</h2>
+          <p>
+          This step only needs to be done once.
+          If you've done this step before, skip to the Token Distribution step.
+          </p>
+          <p>
+          This step must be done online.
+          <span class="online">This computer may be online (not sure yet, still checking).</span>
+          </p>
+          <p>
+          To maximize safety, it's recommended to
+          <button class="clear-secrets">clear</button>
+          all secrets in this tool <i>before</i> connecting to the internet.
+          </p>
           <p>
           Submit this public key and address to MaidSafe so SNT can be issued
           in the future.
           </p>
           <button class="submit">Submit</button>
+      </div>
+
+      <div>
+          <h2>Step 4: Get Token Distribution</h2>
+          <p>
+          This step must be done online.
+          <span class="online">This computer may be online (not sure yet, still checking).</span>
+          </p>
+          <p>
+          To maximize safety, it's recommended to
+          <button class="clear-secrets">clear</button>
+          all secrets in this tool <i>before</i> connecting to the internet.
+          </p>
+          <p>TODO more stuff here to fetch the distribution list</p>
+      </div>
+
+      <div>
+          <h2>Step 5: Decrypt Token Distribution</h2>
+          <p>
+          This step is safest to perform offline.
+          <span class="online">This computer may be online (not sure yet, still checking).</span>
+          </p>
+          <p>
+          <p>TODO more stuff here to decrypt the distribution using the MAID secret key</p>
+      </div>
+
+      <div>
+          <h2>Step 6: Create Your Token Wallet</h2>
+          <p>
+          This step is safest to perform offline.
+          <span class="online">This computer may be online (not sure yet, still checking).</span>
+          </p>
+          <p>TODO more stuff here for EIP2333 to get public key</p>
+      </div>
+
+      <div>
+          <h2>Step 7: Claim Distribution</h2>
+          <p>
+          This step must be done online.
+          <span class="online">This computer may be online (not sure yet, still checking).</span>
+          </p>
+          <p>
+          To maximize safety, it's recommended to
+          <button class="clear-secrets">clear</button>
+          all secrets in this tool <i>before</i> connecting to the internet.
+          </p>
+          <p>TODO more stuff here to transfer from distribution to wallet</p>
       </div>
 
       <script src="bitcoinjs-3.3.0.js"></script>
