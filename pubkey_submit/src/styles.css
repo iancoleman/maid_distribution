@@ -7,6 +7,10 @@
     font-weight: bold;
 }
 
+.distribution-result {
+    overflow-wrap: anywhere;
+}
+
 label,
 input[type='text'],
 textarea {

@@ -4,9 +4,6 @@ const ResponseType = window.__TAURI__.http.ResponseType;
 
 const submitUrl = "http://127.0.0.1:8080/submit";
 
-let greetInputEl;
-let greetMsgEl;
-
 let distributionList = {};
 
 let DOM = {};
@@ -25,11 +22,17 @@ DOM.clear = document.querySelectorAll(".clear-secrets");
 DOM.listFile = document.querySelector(".list-file");
 DOM.fileResult = document.querySelector(".file-result");
 
+DOM.maidSecret = document.querySelector(".maid-secret");
+DOM.distributionResult = document.querySelector(".distribution-result");
+
 const ONLINE_STR = "This computer is currently online and connected to the internet";
 const OFFLINE_STR = "This computer is currently offline";
 
-async function greet() {
-  greetMsgEl.textContent = await invoke("greet", { name: greetInputEl.value });
+async function decryptDistribution(skWif, distributionHex) {
+  return await invoke("decrypt_distribution", {
+      skWif: skWif,
+      distributionHex: distributionHex,
+  });
 }
 
 function showOnline() {
@@ -186,15 +189,20 @@ function showPublicKey(keypair) {
     showAddress(keypair);
 }
 
+function keyToP2wpkhAddress(pk) {
+    let keyhash = bitcoinjs.bitcoin.crypto.hash160(pk.getPublicKeyBuffer());
+    let scriptsig = bitcoinjs.bitcoin.script.witnessPubKeyHash.output.encode(keyhash);
+    let addressbytes = bitcoinjs.bitcoin.crypto.hash160(scriptsig);
+    let scriptpubkey = bitcoinjs.bitcoin.script.scriptHash.output.encode(addressbytes);
+    let network = bitcoinjs.bitcoin.networks.bitcoin;
+    let address = bitcoinjs.bitcoin.address.fromOutputScript(scriptpubkey, network);
+    return address;
+}
+
 function showAddress(pk) {
     let address = pk.getAddress();
     if (DOM.p2wpkh.checked) {
-        let keyhash = bitcoinjs.bitcoin.crypto.hash160(pk.getPublicKeyBuffer());
-        let scriptsig = bitcoinjs.bitcoin.script.witnessPubKeyHash.output.encode(keyhash);
-        let addressbytes = bitcoinjs.bitcoin.crypto.hash160(scriptsig);
-        let scriptpubkey = bitcoinjs.bitcoin.script.scriptHash.output.encode(addressbytes);
-        let network = bitcoinjs.bitcoin.networks.bitcoin;
-        address = bitcoinjs.bitcoin.address.fromOutputScript(scriptpubkey, network);
+        address = keyToP2wpkhAddress(pk);
     }
     DOM.address.textContent = address;
 }
@@ -225,7 +233,7 @@ function loadListFile(e) {
         reader.onload = function (evt) {
             let content = evt.target.result;
             let lines = content.split("\n");
-            let distributionList = {};
+            distributionList = {};
             let progress = 0;
             for (let i=0; i<lines.length; i++) {
                 let cells = lines[i].split(",");
@@ -248,6 +256,43 @@ function loadListFile(e) {
     }
 }
 
+function sizeofarray(a) {
+    let size = 0;
+    for (k in a) {
+        size++;
+    }
+    return size;
+}
+
+function findDistribution() {
+    // find the possible addresses for this secret key
+    let skWif = DOM.maidSecret.value;
+    let sk = bitcoinjs.bitcoin.ECPair.fromWIF(skWif);
+    let p2pkh = sk.getAddress();
+    let p2wpkh = keyToP2wpkhAddress(sk);
+    // find the distribution for these addresses
+    let encryptedDistribution = "";
+    if (p2pkh in distributionList) {
+        encryptedDistribution = distributionList[p2pkh];
+    }
+    if (p2wpkh in distributionList) {
+        encryptedDistribution = distributionList[p2wpkh];
+    }
+    // show error if no distribution found
+    if (encryptedDistribution == "") {
+        let msg = "No distribution for this key. Checked "
+        msg += sizeofarray(distributionList) + " distributions for ";
+        msg += p2pkh + " and " + p2wpkh;
+        DOM.distributionResult.textContent = msg;
+        return;
+    }
+    // decrypt the distribution
+    let distribution = decryptDistribution(skWif, encryptedDistribution)
+        .then((distribution) => {;
+            DOM.distributionResult.textContent = distribution;
+        });
+}
+
 function init() {
     trackOnlineStatus();
     DOM.secretKey.addEventListener("input", secretKeyChanged);
@@ -257,6 +302,7 @@ function init() {
     DOM.p2wpkh.addEventListener("change", pkTypeChanged);
     DOM.submit.addEventListener("click", submit);
     DOM.listFile.addEventListener("change", loadListFile);
+    DOM.maidSecret.addEventListener("input", findDistribution);
     DOM.clear.forEach((e) => {
         e.addEventListener("click", clearSecrets);
     });
