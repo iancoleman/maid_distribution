@@ -7,6 +7,8 @@ const submitUrl = "http://127.0.0.1:8080/submit";
 let greetInputEl;
 let greetMsgEl;
 
+let distributionList = {};
+
 let DOM = {};
 DOM.online = document.querySelectorAll(".online");
 DOM.secretKey = document.querySelector(".secret-key");
@@ -19,6 +21,9 @@ DOM.address = document.querySelector(".address");
 DOM.submit = document.querySelector(".submit");
 DOM.submitFeedback = document.querySelector(".feedback");
 DOM.clear = document.querySelectorAll(".clear-secrets");
+
+DOM.listFile = document.querySelector(".list-file");
+DOM.fileResult = document.querySelector(".file-result");
 
 const ONLINE_STR = "This computer is currently online and connected to the internet";
 const OFFLINE_STR = "This computer is currently offline";
@@ -211,6 +216,38 @@ function clearSecrets() {
     // TODO consider clearing clipboard if it contains a secret key?
 }
 
+
+function loadListFile(e) {
+    let file = DOM.listFile.files[0];
+    if (file) {
+        let reader = new FileReader();
+        reader.readAsText(file, "UTF-8");
+        reader.onload = function (evt) {
+            let content = evt.target.result;
+            let lines = content.split("\n");
+            let distributionList = {};
+            let progress = 0;
+            for (let i=0; i<lines.length; i++) {
+                let cells = lines[i].split(",");
+                if (cells.length != 2) {
+                    continue;
+                }
+                let address = cells[0];
+                let encryptedDistribution = cells[1];
+                distributionList[address] = encryptedDistribution;
+                progress++;
+            }
+            DOM.fileResult.textContent = "Found " + progress + " distributions";
+        }
+        reader.onerror = function (evt) {
+            DOM.fileResult.textContent = "Error reading file";
+        }
+    }
+    else {
+        DOM.fileResult.textContent = "Invalid file selected";
+    }
+}
+
 function init() {
     trackOnlineStatus();
     DOM.secretKey.addEventListener("input", secretKeyChanged);
@@ -219,6 +256,7 @@ function init() {
     DOM.uncompressed.addEventListener("change", pkTypeChanged);
     DOM.p2wpkh.addEventListener("change", pkTypeChanged);
     DOM.submit.addEventListener("click", submit);
+    DOM.listFile.addEventListener("change", loadListFile);
     DOM.clear.forEach((e) => {
         e.addEventListener("click", clearSecrets);
     });
