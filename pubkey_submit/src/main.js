@@ -25,6 +25,9 @@ DOM.fileResult = document.querySelector(".file-result");
 DOM.maidSecret = document.querySelector(".maid-secret");
 DOM.distributionResult = document.querySelector(".distribution-result");
 
+DOM.receiveSk = document.querySelector(".receive-sk");
+DOM.receiveTransfer = document.querySelector(".receive-transfer");
+
 const ONLINE_STR = "This computer is currently online and connected to the internet";
 const OFFLINE_STR = "This computer is currently offline";
 
@@ -288,9 +291,21 @@ function findDistribution() {
     }
     // decrypt the distribution
     let distribution = decryptDistribution(skWif, encryptedDistribution)
-        .then((distribution) => {;
-            DOM.distributionResult.textContent = distribution;
+        .then((distribution) => {
+            if (distribution.length > 0) {
+                DOM.distributionResult.textContent = "Decrypted 1 distribution";
+                let d = JSON.parse(distribution);
+                showDistribution(d);
+            }
+            else {
+                DOM.distributionResult.textContent = "Error decrypting distribution";
+            }
         });
+}
+
+function showDistribution(d) {
+    DOM.receiveSk.textContent = d.secret_key;
+    DOM.receiveTransfer.textContent = d.transfer;
 }
 
 function init() {
